@@ -6,3 +6,8 @@ class FailedToCreateError(Exception):
 class EnvNotExistsError(Exception):
     def __init__(self, name: str, *args: object) -> None:
         super().__init__(f"❌ Env {name} does not exist", *args)
+
+
+class FailedToActivateError(Exception):
+    def __init__(self, name: str, *args: object) -> None:
+        super().__init__(f"Failed to activate {name} venv", *args)

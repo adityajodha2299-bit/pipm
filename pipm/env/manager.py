@@ -5,10 +5,17 @@ from pathlib import Path
 
 from ..core.core import ENV_ROOT, METAFILE  # noqa: TID252
 from ..core.runner import Cmd  # noqa: TID252
-from ..exception import EnvNotExistsError, FailedToCreateError  # noqa: TID252
+from ..exception import (  # noqa: TID252
+    EnvNotExistsError,
+    FailedToCreateError,
+)
+
+type VenvName = str
+type PkgName = str
+type PkgVersion = str
 
 
-def create_env(name: str):
+def create_env(name: VenvName):
     path = ENV_ROOT / name
 
     if path.exists():
@@ -31,7 +38,7 @@ def create_env(name: str):
         json.dump(data, f, indent=2)
 
 
-def list_pkg(name: str) -> dict[str, str]:
+def list_pkg(name: VenvName) -> dict[PkgName, PkgVersion]:
     path = ENV_ROOT / name
     with (path / METAFILE).open("r") as f:
         data = json.load(f)
@@ -39,7 +46,7 @@ def list_pkg(name: str) -> dict[str, str]:
     return data.get("packages", {})
 
 
-def install_pkg(venv: str, pkg: str):
+def install_pkg(venv: VenvName, pkg: str):  # need to modify here
     python_path = get_env_python(venv)
 
     result = (Cmd(str(python_path)) / "-m" / "pip" / "install" / pkg).run()
@@ -51,13 +58,13 @@ def install_pkg(venv: str, pkg: str):
 
     print(f"✔ Installed '{pkg}'")
 
-    package = pkg.split("==", maxsplit=1)[0]
-    version = get_pkg_version(python_path, package)
+    package: PkgName = pkg.split("==", maxsplit=1)[0]
+    version: PkgVersion = get_pkg_version(python_path, package)
 
     add_meta_pkg(venv, package, version)
 
 
-def get_pkg_version(python_path: Path, pkg: str) -> str:
+def get_pkg_version(python_path: Path, pkg: PkgName) -> str:
     result = (Cmd(str(python_path)) / "-m" / "pip" / "show" / pkg).run()
 
     if not result.ok:
@@ -70,7 +77,7 @@ def get_pkg_version(python_path: Path, pkg: str) -> str:
     raise RuntimeError("Version not found")  # noqa: TRY003
 
 
-def add_meta_pkg(venv: str, pkg: str, version: str):
+def add_meta_pkg(venv: VenvName, pkg: PkgName, version: PkgVersion):
     meta_file = ENV_ROOT / venv / METAFILE
 
     with meta_file.open() as f:
@@ -86,24 +93,32 @@ def add_meta_pkg(venv: str, pkg: str, version: str):
         json.dump(data, f, indent=2)
 
 
-def list_env() -> list[str]:
+def list_env() -> list[VenvName]:
     if not ENV_ROOT.exists():
         return []
 
     return [p.name for p in ENV_ROOT.iterdir() if p.is_dir()]
 
 
-def get_env_python(venv: str) -> Path:
+def get_env_python(venv: VenvName) -> Path:
     path = ENV_ROOT / venv / "bin" / "python"
     if not path.exists():
         raise FileNotFoundError()
     return path
 
 
-def delete_env(name: str):
+def delete_env(name: VenvName):
     path = ENV_ROOT / name
 
     if not path.exists():
         raise EnvNotExistsError(name=name)
 
     shutil.rmtree(path)
+
+
+def use_venv(name: VenvName, current_path: Path):
+    path = current_path / ".pipm"
+
+    _data = {"env": name}
+    with path.open("w", encoding="utf-8") as f:
+        json.dump(_data, f)
