@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+from types import NoneType
 from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
@@ -65,12 +66,19 @@ class Cmd:
 
     def run(self) -> CmdResult:
         user_command = self._token_create()
-        result = subprocess.run(user_command, text=True, capture_output=True)  # noqa: S603
+        result = subprocess.run(user_command, stdin=None, stdout=None, stderr=None)  # noqa: S603
         return CmdResult(result.returncode, result.stderr, result.stdout, user_command)
+
+    def run_live(self) -> int:
+        process = subprocess.Popen(self._token_create())  # noqa: S603
+        process.wait()
+        return process.returncode
 
 
 class CmdResult:
-    def __init__(self, code: int, stderr: str, stdout: str, command: list[str]) -> None:
+    def __init__(
+        self, code: int, stderr: str | bytes | None, stdout: str | bytes | None, command: list[str]
+    ) -> None:
         self._code: int = code
         self._command = command
         self._stderr = stderr
@@ -89,11 +97,25 @@ class CmdResult:
 
     @property
     def stderr(self) -> str:
-        return self._stderr
+        st = self._stderr
+        if isinstance(st, str):
+            return st
+        if isinstance(st, NoneType):
+            return ""
+        if isinstance(st, bytes):
+            return st.decode(errors="replace", encoding="utf-8")
+        raise TypeError()
 
     @property
     def stdout(self) -> str:
-        return self._stdout
+        st = self._stdout
+        if isinstance(st, str):
+            return st
+        if st is None:
+            return ""
+        if isinstance(st, bytes):
+            return st.decode(errors="replace", encoding="utf-8")
+        raise TypeError()
 
     @property
     def code(self) -> int:

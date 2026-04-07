@@ -1,10 +1,13 @@
 import platform
+import time
 from pathlib import Path
 
 import typer
 from rich.console import Console
+from rich.tree import Tree
 
-from ..core.core import ENV_ROOT, resolve_name  # noqa: TID252
+from ..core.config import ENV_ROOT  # noqa: TID252
+from ..core.core import generate_tree, get_time, load_pipm, resolve_name, run_file  # noqa: TID252
 from ..env import manager  # noqa: TID252
 from ..exception import (  # noqa: TID252
     EnvNotExistsError,
@@ -72,6 +75,7 @@ def delete(name: str | None = typer.Argument(None, help="delete the given env"))
         manager.delete_env(name=name)
     except EnvNotExistsError:
         console.print(f"[red]❌ Env {name} does not exist[/red]")
+        return_list(manager.list_env())
         raise typer.Exit(1)  # noqa: B904
 
     console.print(f"🗑️ Deleted env: {name}")
@@ -102,6 +106,62 @@ def use(name: str | None = typer.Argument(None, help="use a venv")):
         # This case is impossible for normal senarios
         console.print("WARNING! SOMETHING BAD HAD HAPPEND, NAME GOT BI-PASSED", style="bold red")
         typer.Exit(1)
+
+
+@app.command()
+def run(script: Path | None = typer.Argument(None)):  # noqa: B008
+    project_path = Path.cwd() / ".pipm"
+
+    # checks is the .pipm file exists or not
+    if not project_path.exists():
+        console.print("No `.pipm` file found please first create the file", style="bold red")
+        console.print("→ pipm create <evn name>", style="bold white")
+        return
+
+    _data = load_pipm(project_path)
+
+    env: str | None = _data.env
+    scpt: Path | None = _data.main_script
+
+    if script is None:
+        if scpt is None:
+            console.print(
+                "Please initialize the main script first or give the path of script to run",
+                style="bold red",
+            )
+
+            # Add the line after createing a pipm main-script command
+            return
+        fin_script: Path = scpt.absolute()
+    else:
+        fin_script: Path = script if script.is_absolute() else Path.cwd() / script
+
+    if env is None:
+        console.print(
+            "Env is corrupted. please delete the `.pipm` file and recreate it", style="bold red"
+        )
+        return
+    if env not in manager.list_env():
+        console.print(f"Env {env} doesn't exist", style="bold red")
+        return
+
+    if not fin_script.exists():
+        console.print(f"file [green]{fin_script}[/green] not found", style="bold red")
+        generate_tree(Path.cwd(), Tree(f"[bold white]{Path.cwd().name}[/bold white]"))
+        return
+
+    console.print(
+        f"▶ Running [cyan]{fin_script}[/cyan] with env [green]'{env}'[/green]", end="\n\n"
+    )
+    time_start = time.perf_counter()
+    return_code: int = run_file(env, fin_script)
+    time_stop = time.perf_counter()
+
+    if return_code == 0:
+        console.print("\nThanks for using pipm", style="dim white")
+        console.print(
+            f"[yellow]⚡[/yellow][dim white]Completed in {get_time(time_start, time_stop)}[/]",
+        )
 
 
 if __name__ == "__main__":

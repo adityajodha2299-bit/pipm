@@ -3,7 +3,7 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ..core.core import ENV_ROOT, METAFILE  # noqa: TID252
+from ..core.config import ENV_ROOT, METAFILE  # noqa: TID252
 from ..core.runner import Cmd  # noqa: TID252
 from ..exception import (  # noqa: TID252
     EnvNotExistsError,
@@ -119,6 +119,9 @@ def delete_env(name: VenvName):
 def use_venv(name: VenvName, current_path: Path):
     path = current_path / ".pipm"
 
-    _data = {"env": name}
+    _data = {
+        "env": name,
+        "main_script": None,
+    }
     with path.open("w", encoding="utf-8") as f:
         json.dump(_data, f)
