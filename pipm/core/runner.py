@@ -66,8 +66,19 @@ class Cmd:
 
     def run(self) -> CmdResult:
         user_command = self._token_create()
-        result = subprocess.run(user_command, stdin=None, stdout=None, stderr=None)  # noqa: S603
-        return CmdResult(result.returncode, result.stderr, result.stdout, user_command)
+
+        result = subprocess.run(  # noqa: S603
+            user_command,
+            capture_output=True,
+            text=True,
+        )
+
+        return CmdResult(
+            result.returncode,
+            result.stderr,
+            result.stdout,
+            user_command,
+        )
 
     def run_live(self) -> int:
         process = subprocess.Popen(self._token_create())  # noqa: S603

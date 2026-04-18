@@ -12,7 +12,7 @@ A lightweight Python environment manager inspired by tools like uv, pipx, and po
 
 ## Installation
 
-```bash
+```BASH
 pip install -e .
 ```
 
@@ -31,10 +31,13 @@ pipm delete myenv
 
 ## Future Plans
 
-* `pipm use` (active environment)
-* `pipm run` (run without activation)
-* `pipm add` (install packages easily)
+* `pipm runx` (For fast easy one time use)
 
 ---
 
 Built for learning and experimentation.
+
+---
+
+## For Mental Model
+   Visit [MentalModle.md](MENTAL_MODEL.md)

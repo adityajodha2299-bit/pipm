@@ -12,6 +12,7 @@ from ..env import manager  # noqa: TID252
 from ..exception import (  # noqa: TID252
     EnvNotExistsError,
     FailedToCreateError,
+    PackageNotFoundError,
 )
 
 app = typer.Typer()
@@ -62,7 +63,7 @@ def create(name: str | None = typer.Argument(None, help="name of env")):
 
     console.print(f"✔ Created env '{name}'")
 
-    return_list(manager.list_pkg(name=name))
+    return_list(manager.list_env())
 
 
 @app.command()
@@ -79,6 +80,8 @@ def delete(name: str | None = typer.Argument(None, help="delete the given env"))
         raise typer.Exit(1)  # noqa: B904
 
     console.print(f"🗑️ Deleted env: {name}")
+
+    Path(".pipm").unlink(missing_ok=True)
 
 
 @app.command()
@@ -102,10 +105,41 @@ def use(name: str | None = typer.Argument(None, help="use a venv")):
     if final_name:
         manager.use_venv(name=final_name, current_path=Path.cwd())
         console.print(f"✔ Using env [green]'{final_name}'[/green]", style="bold white")
+
+        activate_path, found = manager.get_activate_script(final_name)
+        if found:
+            console.print("\nTo activate this environment, run:", style="bold white")
+            console.print(f"[dim]→ Run: source {activate_path}[/dim]")
+        else:
+            console.print("Not able to activate the venv", style="red")
     else:
         # This case is impossible for normal senarios
         console.print("WARNING! SOMETHING BAD HAD HAPPEND, NAME GOT BI-PASSED", style="bold red")
-        typer.Exit(1)
+        raise RuntimeError("Unexpected state: resolved env is None")  # noqa: TRY003
+
+
+@app.command()
+def add(pkg: str | None = typer.Argument(None)):
+    if pkg is None:
+        raise typer.BadParameter("Package name required")  # noqa: TRY003
+
+    pipm_data = load_pipm(path=Path.cwd())
+
+    _venv = pipm_data.env
+    if _venv is not None:
+        try:
+            console.print(f"Getting package '{pkg}' from pypi", style="dim white")
+            manager.install_pkg(venv=_venv, pkg=pkg)
+        except PackageNotFoundError:
+            console.print("Invalid Package name!", style="bold red")
+            return
+        except RuntimeError as e:
+            console.print(f"⚠ {e}", style="yellow")
+            return
+
+    else:
+        console.print("Env is corrupted please recreate the env", style="bold red")
+        return
 
 
 @app.command()
@@ -147,7 +181,8 @@ def run(script: Path | None = typer.Argument(None)):  # noqa: B008
 
     if not fin_script.exists():
         console.print(f"file [green]{fin_script}[/green] not found", style="bold red")
-        generate_tree(Path.cwd(), Tree(f"[bold white]{Path.cwd().name}[/bold white]"))
+        tree = Tree(f"[bold white]{Path.cwd().name}[/bold white]")
+        generate_tree(Path.cwd(), tree)
         return
 
     console.print(
@@ -162,6 +197,12 @@ def run(script: Path | None = typer.Argument(None)):  # noqa: B008
         console.print(
             f"[yellow]⚡[/yellow][dim white]Completed in {get_time(time_start, time_stop)}[/]",
         )
+
+
+@app.command()
+def runx(script: Path | None = typer.Argument(None)):  # noqa: B008
+    if script is None:
+        pass
 
 
 if __name__ == "__main__":
