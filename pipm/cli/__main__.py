@@ -1,5 +1,6 @@
 import platform
 import time
+from contextlib import suppress
 from pathlib import Path
 
 import typer
@@ -7,9 +8,18 @@ from rich.console import Console
 from rich.tree import Tree
 
 from ..core.config import ENV_ROOT  # noqa: TID252
-from ..core.core import generate_tree, get_time, load_pipm, resolve_name, run_file  # noqa: TID252
+from ..core.core import diff as c_diff  # noqa: TID252
+from ..core.core import (  # noqa: TID252
+    generate_tree,
+    get_time,
+    load_MetaEnv,
+    load_pipm,
+    resolve_name,
+    run_file,
+)
 from ..env import manager  # noqa: TID252
 from ..exception import (  # noqa: TID252
+    EnvIsCorruptedError,
     EnvNotExistsError,
     FailedToCreateError,
     PackageNotFoundError,
@@ -81,7 +91,9 @@ def delete(name: str | None = typer.Argument(None, help="delete the given env"))
 
     console.print(f"🗑️ Deleted env: {name}")
 
-    Path(".pipm").unlink(missing_ok=True)
+    with suppress(PermissionError, FileNotFoundError):
+        # PermissionError is because of the not deleting the file in homwdir
+        Path(".pipm").unlink(missing_ok=True)
 
 
 @app.command()
@@ -123,13 +135,21 @@ def add(pkg: str | None = typer.Argument(None)):
     if pkg is None:
         raise typer.BadParameter("Package name required")  # noqa: TRY003
 
-    pipm_data = load_pipm(path=Path.cwd())
+    try:
+        pipm_data = load_pipm(path=Path.cwd())
+    except FileNotFoundError as e:
+        console.print("⚠ Please first create .pipm file", style="bold red")
+        console.print("→ pipm use <env name>")
+        raise typer.Exit(1) from e
+    except ValueError as e:
+        console.print("Invalid .pipm file (corrupted JSON)", style="bold red")
+        raise typer.Exit(1) from e
 
     _venv = pipm_data.env
     if _venv is not None:
         try:
             console.print(f"Getting package '{pkg}' from pypi", style="dim white")
-            manager.install_pkg(venv=_venv, pkg=pkg)
+            manager.install_pkg(venv=_venv, pkg=pkg, user_dir=Path.cwd(), _data=pipm_data)
         except PackageNotFoundError:
             console.print("Invalid Package name!", style="bold red")
             return
@@ -200,9 +220,73 @@ def run(script: Path | None = typer.Argument(None)):  # noqa: B008
 
 
 @app.command()
-def runx(script: Path | None = typer.Argument(None)):  # noqa: B008
-    if script is None:
+def sync(scpt_file: Path | None = typer.Option(None, "-s", help="Set a main script")):  # noqa: B008
+    pipm_file = Path.cwd() / ".pipm"
+
+    try:
+        _data = load_pipm(pipm_file)
+    except FileNotFoundError as exc:
+        console.print("`.pipm` file not found.", style="dim red")
+        console.print("First create a pipm file", style="bold red")
+        console.print("→ pipm use <env name>", style="bold white")
+        raise typer.Exit(1) from exc
+    except ValueError as exc:
+        console.print("Invalid .pipm file (corrupted JSON)", style="bold red")
+        raise typer.Exit(1) from exc
+
+    if scpt_file:
         pass
+        # raw_env = _data.env
+        # if raw_env is None:
+        #     raw_env =
+        # temp_template = VenvMetaTemplate(name="")
+
+
+@app.command()
+def diff():
+    try:
+        _pipm_data = load_pipm(path=Path.cwd())
+    except FileNotFoundError as e:
+        console.print("⚠ Please first create .pipm file", style="bold red")
+        console.print("→ pipm use <env name>")
+        raise typer.Exit(1) from e
+    except ValueError as e:
+        console.print("Invalid .pipm file (corrupted JSON)", style="bold red")
+        raise typer.Exit(1) from e
+
+    env_name = _pipm_data.env
+    if env_name is None:
+        return
+
+    try:
+        _meta_data = load_MetaEnv(env_name)
+    except EnvIsCorruptedError as e:
+        console.print(e, style="dim")
+        raise typer.Exit(1) from e
+
+    pipm_pgk = _pipm_data.packages or {}
+    meta_pkg = _meta_data.packages or {}
+
+    result = c_diff(desired=pipm_pgk, actual=meta_pkg)
+
+    # Now the printing part
+    if len(result.extra) == 0 and len(result.missing) == 0:
+        console.print("✔ All packages are in sync", style="bold")
+        return
+
+    if len(result.missing) != 0:
+        console.print("Missing packages:", style="bold")
+        for name in sorted(result.missing):
+            console.print(f" [grey]-[/grey] {name}", style="red")
+
+    if len(result.extra) != 0:
+        console.print("\n\n\u2795 Extra", style="bold")
+        for name in sorted(result.extra):
+            console.print(f" [grey]-[/grey] {name}", style="yellow")
+
+    console.print("\n\n✅ OK", style="dim")
+    for name in result.ok:
+        console.print(f" - {name}", style="dim")
 
 
 if __name__ == "__main__":

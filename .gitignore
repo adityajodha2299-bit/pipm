@@ -12,5 +12,6 @@ uv.lock
 # Virtual environments
 .venv
 .vscode
+.pre-commit-config.yaml
 
 .DS_Store

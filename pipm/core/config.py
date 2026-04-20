@@ -13,6 +13,17 @@ type PkgVersion = str
 type PkgExtra = list[str]
 
 
+ENV_ROOT: EnvPath = Path.home() / ".pipm" / "envs"
+METAFILE: MetaPath = Path("metadata.json")
+
+
+class VenvMetaTemplate:
+    name: str
+    main_script: None
+    packages: dict[str, str]
+    created_at: str
+
+
 class PackageJson(TypedDict):
     version: str
     extras: list[str]
@@ -54,5 +65,8 @@ class PipmData:
     packages: dict[PkgName, PackageInfo] | None
 
 
-ENV_ROOT: EnvPath = Path.home() / ".pipm" / "envs"
-METAFILE: MetaPath = Path("metadata.json")
+class DiffResult:
+    def __init__(self):
+        self.missing = {}
+        self.extra = {}
+        self.ok = {}

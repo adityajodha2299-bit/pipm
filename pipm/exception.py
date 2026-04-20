@@ -13,6 +13,11 @@ class EnvNotExistsError(Exception):
         super().__init__(f"❌ Env {name} does not exist", *args)
 
 
+class PipmFileNotExistsError(Exception):
+    def __init__(self, name: str, *args: object) -> None:
+        super().__init__(*args, name)
+
+
 class FailedToActivateError(Exception):
     def __init__(self, name: str, *args: object) -> None:
         super().__init__(f"Failed to activate {name} venv", *args)

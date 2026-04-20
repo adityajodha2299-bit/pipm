@@ -11,10 +11,7 @@ A lightweight Python environment manager inspired by tools like uv, pipx, and po
 * Simple CLI interface
 
 ## Installation
-
-```BASH
-pip install -e .
-```
+> You can visit [Start Guilde](START_GUIDE.md)
 
 ## Usage
 
@@ -40,4 +37,4 @@ Built for learning and experimentation.
 ---
 
 ## For Mental Model
-   Visit [MentalModle.md](MENTAL_MODEL.md)
+> You can visit [MentalModle.md](MENTAL_MODEL.md) for more information.

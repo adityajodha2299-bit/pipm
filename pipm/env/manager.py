@@ -10,8 +10,9 @@ from packaging.utils import canonicalize_name
 from ..core.config import (  # noqa: TID252
     ENV_ROOT,
     METAFILE,
+    PackageInfo,
+    PipmData,
     PkgName,
-    PkgVersion,
     VenvName,
 )
 from ..core.runner import Cmd  # noqa: TID252
@@ -19,6 +20,7 @@ from ..exception import (  # noqa: TID252
     EnvNotExistsError,
     FailedToCreateError,
     PackageNotFoundError,
+    PipmFileNotExistsError,
 )
 
 
@@ -36,7 +38,7 @@ def create_env(name: VenvName):
 
     meta_file = path / METAFILE
 
-    data = {
+    _data = {
         "name": name,
         "main_script": None,
         "packages": {},
@@ -44,7 +46,7 @@ def create_env(name: VenvName):
     }
 
     with meta_file.open("w") as f:
-        json.dump(data, f, indent=2)
+        json.dump(_data, f, indent=2)
 
 
 def list_pkg(name: VenvName) -> dict[PkgName, dict[str, list[str] | str]]:
@@ -59,7 +61,7 @@ def list_pkg(name: VenvName) -> dict[PkgName, dict[str, list[str] | str]]:
     return packages
 
 
-def install_pkg(venv: VenvName, pkg: str):
+def install_pkg(venv: VenvName, pkg: str, user_dir: Path, _data: PipmData):
     python_path = get_env_python(venv)
 
     result = (Cmd(str(python_path)) / "-m" / "pip" / "install" / pkg).run()
@@ -76,16 +78,14 @@ def install_pkg(venv: VenvName, pkg: str):
         req = Requirement(pkg)
         package = canonicalize_name(req.name)
         extras = list(req.extras)
-        specifier = str(req.specifier)
+        specifier = str(req.specifier) or "*"
     except InvalidRequirement:
         raise PackageNotFoundError(f"Failed to install '{pkg}'")  # noqa: B904, TRY003
 
-    try:
-        version = get_pkg_version(python_path, package)
-    except Exception as e:  # noqa: BLE001
-        version = f"unknown {e}"
-
-    add_meta_pkg(venv, package, version, extras, specifier)
+    update_meta_pkg(
+        venv_name=venv, python_path=python_path, package=package, extras=extras, specifier=specifier
+    )
+    add_pipm_pkg(venv, package, user_dir, _data, extras, specifier)
 
 
 def get_pkg_version(python_path: Path, pkg: PkgName) -> str:
@@ -99,35 +99,80 @@ def get_pkg_version(python_path: Path, pkg: PkgName) -> str:
     return result.stdout.strip()
 
 
-def add_meta_pkg(
-    venv: VenvName,
-    pkg: PkgName,
-    version: PkgVersion,
-    extras: list[str] | None = None,
-    specifier: str = "",
-):
-    meta_file = ENV_ROOT / venv / METAFILE
+def update_meta_pkg(
+    venv_name: VenvName, python_path: Path, package: PkgName, extras: list[str], specifier: str
+):  # Here i not used load_meta coz i am lazy but in future i will use it.
 
-    if not meta_file.exists():
-        raise EnvNotExistsError(name=venv)
+    meta_pth = ENV_ROOT / venv_name / METAFILE
 
-    with meta_file.open() as f:
-        data = json.load(f)
+    if not meta_pth.exists():
+        raise FileNotFoundError(venv_name)
 
-    packages = data.get("packages")
-    if not isinstance(packages, dict):
-        packages = {}
+    with meta_pth.open("rt") as f:
+        _data = json.load(f)
 
-    packages[pkg] = {
+    packages = _data.get("packages", {})
+    package = canonicalize_name(package)
+
+    try:
+        version = get_pkg_version(python_path, package)
+    except Exception as e:  # noqa: BLE001
+        version = f"unknown {e}"
+
+    packages[package] = {
         "version": version,
-        "extras": extras or [],
-        "specifier": specifier,
+        "extras": extras,
+        "specifier": specifier or "*",
     }
 
-    data["packages"] = packages
+    _data["packages"] = packages
 
-    with meta_file.open("w") as f:
-        json.dump(data, f, indent=2)
+    with meta_pth.open("w") as f:
+        json.dump(_data, f, indent=2)
+
+
+def add_pipm_pkg(
+    venv: VenvName,
+    pkg: PkgName,
+    user_dir: Path,
+    _data: PipmData,
+    extras: list[str] | None = None,
+    specifier: str = "*",
+):
+    pipm_file = user_dir / ".pipm" if user_dir.name != ".pipm" else user_dir
+
+    if not pipm_file.exists():
+        raise PipmFileNotExistsError(name=venv)
+
+    pkg = canonicalize_name(pkg)
+
+    packages = _data.packages
+    if packages is None:
+        packages = {}
+
+    pkg_info = PackageInfo(
+        version="",
+        extras=extras or [],
+        specifier=specifier,
+    )
+
+    packages[pkg] = pkg_info
+
+    _data.packages = packages
+
+    with pipm_file.open("w") as f:
+        json.dump(
+            {
+                "env": _data.env,
+                "main_script": str(_data.main_script) if _data.main_script else None,
+                "packages": {
+                    name: {"specifier": pkg.specifier, "extras": pkg.extras}
+                    for name, pkg in _data.packages.items()
+                },
+            },
+            f,
+            indent=2,
+        )
 
 
 def list_env() -> list[VenvName]:

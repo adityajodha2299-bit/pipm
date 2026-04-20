@@ -3,6 +3,9 @@ from pathlib import Path
 from typing import Any
 
 import tomllib
+from packaging.specifiers import SpecifierSet
+from packaging.utils import canonicalize_name
+from packaging.version import InvalidVersion, Version
 from rich.tree import Tree
 
 from ..env.manager import (  # noqa: TID252
@@ -13,12 +16,51 @@ from ..exception import EnvIsCorruptedError, EnvNotExistsError  # noqa: TID252
 from .config import (
     ENV_ROOT,
     METAFILE,
+    DiffResult,
     PackageInfo,
     PipmData,
     PkgName,
     VenvMeta,
 )
 from .runner import Cmd
+
+
+def diff(desired: dict[PkgName, PackageInfo], actual: dict[PkgName, PackageInfo]):
+    result = DiffResult()
+
+    desired = desired or {}
+    actual = actual or {}
+
+    desired = {canonicalize_name(k): v for k, v in desired.items()}
+    actual = {canonicalize_name(k): v for k, v in actual.items()}
+
+    for name, desired_pkg in desired.items():
+        if name not in actual:
+            result.missing[name] = desired_pkg
+        else:
+            actual_pkg = actual[name]
+
+            if not desired_pkg.specifier or desired_pkg.specifier == "*":
+                result.ok[name] = actual_pkg
+            else:
+                spec = SpecifierSet(desired_pkg.specifier)
+
+                try:
+                    version = Version(actual_pkg.version)
+                except InvalidVersion:
+                    result.missing[name] = desired_pkg
+                    continue
+
+                if version in spec:
+                    result.ok[name] = actual_pkg
+                else:
+                    result.missing[name] = desired_pkg
+
+    for name, actual_pkg in actual.items():
+        if name not in desired:
+            result.extra[name] = actual_pkg
+
+    return result
 
 
 def generate_tree(path: Path, tree: Tree, find_file: str = ".py"):
@@ -71,8 +113,8 @@ def load_pipm(path: Path) -> PipmData:
     try:
         with pth.open("rt") as f:
             data = json.load(f)
-    except json.JSONDecodeError:
-        raise ValueError("Invalid .pipm file (corrupted JSON)")  # noqa: B904, TRY003
+    except json.JSONDecodeError as e:
+        raise ValueError("Invalid .pipm file (corrupted JSON)") from e  # noqa: TRY003
 
     packages: dict[PkgName, PackageInfo] | None = None
     raw_packages: Any = data.get("packages")
@@ -92,9 +134,9 @@ def load_pipm(path: Path) -> PipmData:
             if not isinstance(extras, list):
                 extras = []
 
-            specifier = info.get("specifier", "")
+            specifier = info.get("specifier", "*")
             if not isinstance(specifier, str):
-                specifier = ""
+                specifier = "*"
 
             packages[name] = PackageInfo(version=version, extras=extras, specifier=specifier)
 
@@ -112,13 +154,15 @@ def load_MetaEnv(name: VenvName) -> VenvMeta:  # noqa: N802
     meta_file = ENV_ROOT / name / METAFILE
 
     if not meta_file.exists():
-        raise EnvIsCorruptedError()
+        raise EnvIsCorruptedError(  # noqa: TRY003
+            f"{METAFILE} not found.\nPlease recreate the env"
+        ) from FileNotFoundError()
 
     try:
         with meta_file.open() as f:
             data = json.load(f)
-    except json.JSONDecodeError:
-        raise EnvIsCorruptedError()  # noqa: B904
+    except json.JSONDecodeError as e:
+        raise EnvIsCorruptedError() from e
 
     packages: dict[PkgName, PackageInfo] = {}
 
