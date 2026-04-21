@@ -22,15 +22,15 @@ No marketing. Just trade-offs.
 
 | Feature                       | pip | pipx          | uv              | cargo        | pipm            |
 | ----------------------------- | --- | ------------- | --------------- | ------------ | --------------- |
-| Creates virtual environments  | ❌   | ⚠️ (internal) | ✅               | ✅ (implicit) | ✅               |
-| Project ↔ env binding         | ❌   | ❌             | ⚠️              | ✅            | ✅               |
-| Dependency tracking           | ❌   | ❌             | ✅               | ✅            | ✅ (basic)       |
-| Lockfile / reproducibility    | ❌   | ❌             | ✅               | ✅            | ❌               |
-| Built-in script runner        | ❌   | ❌             | ✅               | ✅            | ✅               |
-| Handles dependency resolution | ❌   | ❌             | ✅ (very strong) | ✅            | ❌               |
-| Speed                         | ⚠️  | ⚠️            | 🚀              | 🚀           | ⚠️              |
-| Production readiness          | ✅   | ✅             | ✅               | ✅            | ❌ (early stage) |
-| Ecosystem maturity            | 🔥  | 🔥            | 🚀 growing      | 🔥           | ❌               |
+| Creates virtual environments  | ❌  | ⚠️ (internal)  | ✅              | ✅ (implicit) | ✅               |
+| Project ↔ env binding         | ❌  | ❌             | ⚠️              | ✅            | ✅               |
+| Dependency tracking           | ❌  | ❌             | ✅              | ✅            | ✅ (basic)       |
+| Lockfile / reproducibility    | ❌  | ❌             | ✅              | ✅            | ❌               |
+| Built-in script runner        | ❌  | ❌             | ✅              | ✅            | ✅               |
+| Handles dependency resolution | ❌  | ❌             | ✅ (very strong)| ✅            | ❌               |
+| Speed                         | ⚠️  | ⚠️             | 🚀              | 🚀            | ⚠️               |
+| Production readiness          | ✅  | ✅             | ✅              | ✅            | ❌ (early stage) |
+| Ecosystem maturity            | 🔥  | 🔥             | 🚀 growing      | 🔥            | ❌               |
 
 ---
 
@@ -49,7 +49,7 @@ No marketing. Just trade-offs.
 * No dependency tracking
 * Easy to break global Python
 
-👉 pip is a *building block*, not a workflow tool.
+>👉 pip is a *building block*, not a workflow tool.
 
 ---
 
@@ -66,7 +66,7 @@ No marketing. Just trade-offs.
 * No dependency tracking
 * No workflow support
 
-👉 pipx is for *apps*, not development.
+> 👉 pipx is for *apps*, not development.
 
 ---
 
@@ -84,7 +84,7 @@ No marketing. Just trade-offs.
 * More complex mental model
 * Still evolving ecosystem
 
-👉 uv is the **most powerful modern Python tool right now**.
+>👉 uv is the **most powerful modern Python tool right now**.
 
 ---
 
@@ -101,7 +101,7 @@ No marketing. Just trade-offs.
 * Not Python (different ecosystem)
 * Tight integration depends on Rust language design
 
-👉 cargo is what Python tools *wish* they were.
+>👉 cargo is what Python tools *wish* they were.
 
 ---
 
@@ -124,7 +124,7 @@ No marketing. Just trade-offs.
 * Early-stage, not production-ready
 * No ecosystem/tooling around it
 
-👉 pipm prioritizes **simplicity over power**.
+>👉 pipm prioritizes **simplicity over power**.
 
 ---
 
@@ -172,6 +172,6 @@ It does **not**:
 * `cargo` → ideal design (reference)
 * `pipm` → simple, experimental workflow tool
 
-pipm is useful **only if you value simplicity over capability**.
+>pipm is useful **only if you value simplicity over capability**.
 
 ---
